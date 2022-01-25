@@ -48,7 +48,7 @@ object SchemaSpec extends ZIOSpecDefault {
    * class that has two fields.
    */
   def extractFirstField[F1, F2, T](schema: Schema.CaseClass2[F1, F2, T], t: T): F1 =
-    ???
+    TODO
 
   /**
    * EXERCISE
@@ -57,7 +57,7 @@ object SchemaSpec extends ZIOSpecDefault {
    * class that has two fields.
    */
   def extractSecondField[F1, F2, T](schema: Schema.CaseClass2[F1, F2, T], t: T): F2 =
-    ???
+    TODO
 
   /**
    * EXERCISE
@@ -66,7 +66,7 @@ object SchemaSpec extends ZIOSpecDefault {
    * has two fields.
    */
   def construct2[F1, F2, T](schema: Schema.CaseClass2[F1, F2, T], f1: F1, f2: F2): T =
-    ???
+    TODO
 
   //
   // SCHEMA CAPABILITIES FOR ENUMS
@@ -101,7 +101,7 @@ object SchemaSpec extends ZIOSpecDefault {
    * the first of its subtypes.
    */
   def extractFirstCase[C1 <: T, C2 <: T, T](schema: Schema.Enum2[C1, C2, T], t: T): Option[C1] =
-    ???
+    TODO
 
   /**
    * EXERCISE
@@ -110,7 +110,7 @@ object SchemaSpec extends ZIOSpecDefault {
    * the second of its subtypes.
    */
   def extractSecondCase[C1 <: T, C2 <: T, T](schema: Schema.Enum2[C1, C2, T], t: T): Option[C2] =
-    ???
+    TODO
 
   /**
    * EXERCISE
@@ -119,7 +119,7 @@ object SchemaSpec extends ZIOSpecDefault {
    * trait. Hint: This is easier than you think due to the type bounds!
    */
   def constructFirstCase[C1 <: T, C2 <: T, T](schema: Schema.Enum2[C1, C2, T], c1: C1): T =
-    ???
+    TODO
 
   /**
    * EXERCISE
@@ -128,7 +128,7 @@ object SchemaSpec extends ZIOSpecDefault {
    * trait. Hint: This is easier than you think due to the type bounds!
    */
   def constructSecondCase[C1 <: T, C2 <: T, T](schema: Schema.Enum2[C1, C2, T], c2: C2): T =
-    ???
+    TODO
 
   //
   // MANUAL CREATION OF SCHEMAS
@@ -140,21 +140,21 @@ object SchemaSpec extends ZIOSpecDefault {
      *
      * Manually define a schema for the primitive type `Int`.
      */
-    implicit lazy val schemaInt: Schema[Int] = ???
+    implicit lazy val schemaInt: Schema[Int] = TODO
 
     /**
      * EXERCISE
      *
      * Manually define a schema for the primitive type `String`.
      */
-    implicit lazy val schemaString: Schema[String] = ???
+    implicit lazy val schemaString: Schema[String] = TODO
 
     /**
      * EXERCISE
      *
      * Manually define a schema for the primitive type `Boolean`.
      */
-    implicit lazy val schemaBoolean: Schema[Boolean] = ???
+    implicit lazy val schemaBoolean: Schema[Boolean] = TODO
   }
 
   final case class Point(x: Int, y: Int)
@@ -165,7 +165,7 @@ object SchemaSpec extends ZIOSpecDefault {
      *
      * Manually define a schema for the case class `Point`.
      */
-    implicit lazy val schema: Schema.CaseClass2[Int, Int, Point] = ???
+    implicit lazy val schema: Schema.CaseClass2[Int, Int, Point] = TODO
   }
 
   sealed trait Amount
@@ -178,7 +178,7 @@ object SchemaSpec extends ZIOSpecDefault {
      *
      * Manually define a schema for the sealed trait `Amount`.
      */
-    implicit lazy val schema: Schema.Enum2[USD, GBP, Amount] = ???
+    implicit lazy val schema: Schema.Enum2[USD, GBP, Amount] = TODO
   }
 
   //
@@ -202,7 +202,7 @@ object SchemaSpec extends ZIOSpecDefault {
      * `DeriveSchema.gen` method.
      */
     implicit lazy val schema: Schema.CaseClass3[String, List[Actor], Director, Movie] =
-      ???
+      TODO
 
     val bladeRunner = Movie("Blade Runner", List(Actor.harrisonFord), Director.ridleyScott)
   }
@@ -220,8 +220,43 @@ object SchemaSpec extends ZIOSpecDefault {
      * Automatically derive a schema for the sealed trait `Color` using
      * `DeriveSchema.gen` method.
      */
-    implicit lazy val schema: Schema.Enum4[Red.type, Green.type, Blue.type, Custom, Color] =
-      ???
+    implicit lazy val schema: Schema.Enum4[Blue.type, Custom, Green.type, Red.type, Color] =
+      TODO
+  }
+
+  //
+  // OPERATIONS
+  //
+
+  /**
+   * EXERCISE
+   *
+   * Use `Schema#transform` to change the `Schema[String]` into a
+   * `Schema[UserId]`.
+   */
+  final case class UserId(value: String)
+  object UserId {
+    implicit lazy val schema: Schema[UserId] =
+      Schema[String].TODO
+  }
+
+  /**
+   * EXERCISE
+   *
+   * Use `Schema#transformOrFail` to change the `Schema[String]` into an Email,
+   * but only if the string is a valid email.
+   */
+  sealed abstract case class Email private (value: String)
+  object Email {
+    def isValidEmail(email: String): Boolean =
+      """(?=[^\s]+)(?=(\w+)@([\w\.]+))""".r.findFirstIn(email).isDefined
+
+    def fromString(value: String): Either[String, Email] =
+      if (isValidEmail(value)) Right(new Email(value) {})
+      else Left(s"Invalid email: $value")
+
+    implicit lazy val schema: Schema[Email] =
+      Schema[String].TODO
   }
 
   //
@@ -233,7 +268,7 @@ object SchemaSpec extends ZIOSpecDefault {
    *
    * Define a generic method that can extract out all the fields of any record.
    */
-  def fieldNames[C](schema: Schema.Record[C]): List[String] = ???
+  def fieldNames[C](schema: Schema.Record[C]): List[String] = TODO
 
   final case class User(name: String, password: String)
   object User {
@@ -255,7 +290,7 @@ object SchemaSpec extends ZIOSpecDefault {
    * Define a generic method that can take strings in any "password" field and
    * replace their characters by asterisks, for security purposes.
    */
-  def maskPasswords[A](schema: Schema.Record[A], a: A): A = ???
+  def maskPasswords[A](schema: Schema.Record[A], a: A): A = TODO
 
   final case class CSV(headers: List[String], data: List[List[String]]) {
     def get(row: Int, field: String): Either[String, String] =
@@ -284,7 +319,7 @@ object SchemaSpec extends ZIOSpecDefault {
    * You do not have to support all types, just those required to get the
    * corresponding test to pass.
    */
-  def fromCSV[A](csv: CSV, row: Int)(implicit schema: Schema[A]): Either[String, A] = ???
+  def fromCSV[A](csv: CSV, row: Int)(implicit schema: Schema[A]): Either[String, A] = TODO
 
   //
   // CODECS
@@ -296,14 +331,14 @@ object SchemaSpec extends ZIOSpecDefault {
    *
    * Define a protobuf encoder for the class `Movie`.
    */
-  lazy val movieEncoder: Movie => Chunk[Byte] = ???
+  lazy val movieEncoder: Movie => Chunk[Byte] = TODO
 
   /**
    * EXERCISE
    *
    * Define a protobuf decoder for the class `Movie`.
    */
-  lazy val movieDecoder: Chunk[Byte] => Either[String, Movie] = ???
+  lazy val movieDecoder: Chunk[Byte] => Either[String, Movie] = TODO
 
   def spec = suite("SchemaSpec") {
     suite("record capabilities") {
@@ -375,7 +410,24 @@ object SchemaSpec extends ZIOSpecDefault {
           test("enum derivation") {
             val color = Color.Custom(1, 2, 3)
 
-            assertTrue(Color.schema.case4.deconstruct(color) == Some(color))
+            assertTrue(Color.schema.case2.deconstruct(color) == Some(color))
+          }
+      } +
+      suite("operations") {
+        test("transform") {
+          val userId = UserId("sholmes")
+
+          assertTrue(
+            Schema[UserId].toDynamic(userId) ==
+              DynamicValue.Primitive("sholmes", StandardType.StringType)
+          )
+        } +
+          test("transformOrFail") {
+            val validEmail   = DynamicValue.Primitive("sherlock@holmes.com", StandardType.StringType)
+            val invalidEmail = DynamicValue.Primitive("sherlock", StandardType.StringType)
+
+            assertTrue(Schema[Email].fromDynamic(validEmail).isRight) &&
+            assertTrue(Schema[Email].fromDynamic(invalidEmail).isLeft)
           }
       } +
       suite("generic programming") {

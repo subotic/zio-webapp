@@ -22,6 +22,8 @@ package webapp.workshop
 
 import zio.schema._
 import zio.test._
+import zio.schema.RecordSchemas.CaseClass2
+import zio.schema.codec.ProtobufCodec
 
 object SchemaSpec extends ZIOSpecDefault {
   //
@@ -30,6 +32,9 @@ object SchemaSpec extends ZIOSpecDefault {
   final case class Person(name: String, age: Int)
   object Person {
     import Schema._
+
+    // Schema[A] describes the structure of the data type A.
+    // Supports primitive types, ADTs and collections
 
     implicit val schema =
       Schema.CaseClass2[String, Int, Person](
@@ -48,7 +53,7 @@ object SchemaSpec extends ZIOSpecDefault {
    * class that has two fields.
    */
   def extractFirstField[F1, F2, T](schema: Schema.CaseClass2[F1, F2, T], t: T): F1 =
-    ???
+    schema.extractField1(t)
 
   /**
    * EXERCISE
@@ -57,7 +62,7 @@ object SchemaSpec extends ZIOSpecDefault {
    * class that has two fields.
    */
   def extractSecondField[F1, F2, T](schema: Schema.CaseClass2[F1, F2, T], t: T): F2 =
-    ???
+    schema.extractField2(t)
 
   /**
    * EXERCISE
@@ -66,7 +71,7 @@ object SchemaSpec extends ZIOSpecDefault {
    * has two fields.
    */
   def construct2[F1, F2, T](schema: Schema.CaseClass2[F1, F2, T], f1: F1, f2: F2): T =
-    ???
+    schema.construct(f1, f2)
 
   //
   // SCHEMA CAPABILITIES FOR ENUMS
@@ -101,7 +106,7 @@ object SchemaSpec extends ZIOSpecDefault {
    * the first of its subtypes.
    */
   def extractFirstCase[C1 <: T, C2 <: T, T](schema: Schema.Enum2[C1, C2, T], t: T): Option[C1] =
-    ???
+    schema.case1.deconstruct(t)
 
   /**
    * EXERCISE
@@ -110,7 +115,7 @@ object SchemaSpec extends ZIOSpecDefault {
    * the second of its subtypes.
    */
   def extractSecondCase[C1 <: T, C2 <: T, T](schema: Schema.Enum2[C1, C2, T], t: T): Option[C2] =
-    ???
+    schema.case2.deconstruct(t)
 
   /**
    * EXERCISE
@@ -119,7 +124,7 @@ object SchemaSpec extends ZIOSpecDefault {
    * trait. Hint: This is easier than you think due to the type bounds!
    */
   def constructFirstCase[C1 <: T, C2 <: T, T](schema: Schema.Enum2[C1, C2, T], c1: C1): T =
-    ???
+    c1
 
   /**
    * EXERCISE
@@ -128,7 +133,7 @@ object SchemaSpec extends ZIOSpecDefault {
    * trait. Hint: This is easier than you think due to the type bounds!
    */
   def constructSecondCase[C1 <: T, C2 <: T, T](schema: Schema.Enum2[C1, C2, T], c2: C2): T =
-    ???
+    c2
 
   //
   // MANUAL CREATION OF SCHEMAS
@@ -140,45 +145,67 @@ object SchemaSpec extends ZIOSpecDefault {
      *
      * Manually define a schema for the primitive type `Int`.
      */
-    implicit lazy val schemaInt: Schema[Int] = ???
+    implicit lazy val schemaInt: Schema[Int] = Schema[Int]
 
     /**
      * EXERCISE
      *
      * Manually define a schema for the primitive type `String`.
      */
-    implicit lazy val schemaString: Schema[String] = ???
+    implicit lazy val schemaString: Schema[String] = Schema.Primitive(StandardType.StringType)
 
     /**
      * EXERCISE
      *
      * Manually define a schema for the primitive type `Boolean`.
      */
-    implicit lazy val schemaBoolean: Schema[Boolean] = ???
+    implicit lazy val schemaBoolean: Schema[Boolean] = Schema.Primitive(StandardType.BoolType)
   }
 
   final case class Point(x: Int, y: Int)
   object Point {
+
+    import Schema._
 
     /**
      * EXERCISE
      *
      * Manually define a schema for the case class `Point`.
      */
-    implicit lazy val schema: Schema.CaseClass2[Int, Int, Point] = ???
+    implicit lazy val schema: Schema.CaseClass2[Int, Int, Point] =
+      Schema.CaseClass2[Int, Int, Point](
+        Field("x", primitives.schemaInt),
+        Field("y", primitives.schemaInt),
+        Point(_, _),
+        _.x,
+        _.y
+      )
   }
 
   sealed trait Amount
   object Amount {
+
+    import Schema._
+
     final case class USD(dollars: Int, cents: Int) extends Amount
-    final case class GBP(pounds: Int, pence: Int)  extends Amount
+    object USD {
+      implicit val schema = DeriveSchema.gen[USD]
+    }
+    final case class GBP(pounds: Int, pence: Int) extends Amount
+    object GBP {
+      implicit val schema = DeriveSchema.gen[GBP]
+    }
 
     /**
      * EXERCISE
      *
      * Manually define a schema for the sealed trait `Amount`.
      */
-    implicit lazy val schema: Schema.Enum2[USD, GBP, Amount] = ???
+    implicit lazy val schema: Schema.Enum2[USD, GBP, Amount] =
+      Schema.Enum2[USD, GBP, Amount](
+        Case("USD", Schema[USD], _.asInstanceOf[USD]),
+        Case("GBP", Schema[GBP], _.asInstanceOf[GBP])
+      )
   }
 
   //
@@ -186,11 +213,13 @@ object SchemaSpec extends ZIOSpecDefault {
   //
   final case class Actor(name: String)
   object Actor {
-    val harrisonFord = Actor("Harrison Ford")
+    val harrisonFord    = Actor("Harrison Ford")
+    implicit val schema = DeriveSchema.gen[Actor]
   }
   final case class Director(name: String)
   object Director {
-    val ridleyScott = Director("Ridley Scott")
+    val ridleyScott     = Director("Ridley Scott")
+    implicit val schema = DeriveSchema.gen[Director]
   }
   final case class Movie(title: String, stars: List[Actor], director: Director)
   object Movie {
@@ -202,7 +231,7 @@ object SchemaSpec extends ZIOSpecDefault {
      * `DeriveSchema.gen` method.
      */
     implicit lazy val schema: Schema.CaseClass3[String, List[Actor], Director, Movie] =
-      ???
+      DeriveSchema.gen[Movie]
 
     val bladeRunner = Movie("Blade Runner", List(Actor.harrisonFord), Director.ridleyScott)
   }
@@ -220,9 +249,24 @@ object SchemaSpec extends ZIOSpecDefault {
      * Automatically derive a schema for the sealed trait `Color` using
      * `DeriveSchema.gen` method.
      */
-    implicit lazy val schema: Schema.Enum4[Red.type, Green.type, Blue.type, Custom, Color] =
-      ???
+    implicit lazy val schema: Schema.Enum4[Blue.type, Custom, Green.type, Red.type, Color] =
+      DeriveSchema.gen[Color]
   }
+
+  final case class Email(value: String)
+
+  def isValidEmail(email: String): Boolean = ???
+
+  val emailSchema: Schema[Email] =
+    Schema[String].transform[Email](string => Email(string), email => email.value)
+
+  val emailSchema2: Schema[Email] =
+    Schema[String].transformOrFail[Email](
+      string =>
+        if (isValidEmail(string)) Right(Email(string))
+        else Left("error message"),
+      email => Right(email.value)
+    )
 
   //
   // GENERIC PROGRAMMING
@@ -233,7 +277,11 @@ object SchemaSpec extends ZIOSpecDefault {
    *
    * Define a generic method that can extract out all the fields of any record.
    */
-  def fieldNames[C](schema: Schema.Record[C]): List[String] = ???
+  def fieldNames[C](implicit schema: Schema.Record[C]): List[String] =
+    schema.structure.map(_.label).toList
+
+  fieldNames[Person]
+  fieldNames[Movie]
 
   final case class User(name: String, password: String)
   object User {
@@ -255,7 +303,14 @@ object SchemaSpec extends ZIOSpecDefault {
    * Define a generic method that can take strings in any "password" field and
    * replace their characters by asterisks, for security purposes.
    */
-  def maskPasswords[A](schema: Schema.Record[A], a: A): A = ???
+  def maskPasswords[A](schema: Schema.Record[A], a: A): A = {
+    val dynamicValue = schema.toDynamic(a)
+
+    def loop(dynamicValue: DynamicValue): DynamicValue = ???
+
+    schema.fromDynamic(loop(dynamicValue)).toOption.get
+
+  }
 
   final case class CSV(headers: List[String], data: List[List[String]]) {
     def get(row: Int, field: String): Either[String, String] =
@@ -284,26 +339,42 @@ object SchemaSpec extends ZIOSpecDefault {
    * You do not have to support all types, just those required to get the
    * corresponding test to pass.
    */
-  def fromCSV[A](csv: CSV, row: Int)(implicit schema: Schema[A]): Either[String, A] = ???
+  def fromCSV[A](csv: CSV, row: Int)(implicit schema: Schema[A]): Either[String, A] = {
+
+    def coerce[F](schema: Schema[F], value: String): Either[String, F] = ???
+
+    schema match {
+      case Schema.CaseClass2(field1, field2, construct, _, _, _) =>
+        for {
+          a <- csv.get(row.field1.label)
+          b <- csv.get(row.field2.label)
+        } yield construct(coerce(field1.schema, a), coerce(field2.schema), b)
+      case _ => Left(s"The schema ${schema} is not supported")
+    }
+  }
 
   //
   // CODECS
   //
   import zio.Chunk
 
+  import zio.schema._
+
   /**
    * EXERCISE
    *
    * Define a protobuf encoder for the class `Movie`.
    */
-  lazy val movieEncoder: Movie => Chunk[Byte] = ???
+  lazy val movieEncoder: Movie => Chunk[Byte] =
+    ProtobufCodec.encode(Schema[Movie])
 
   /**
    * EXERCISE
    *
    * Define a protobuf decoder for the class `Movie`.
    */
-  lazy val movieDecoder: Chunk[Byte] => Either[String, Movie] = ???
+  lazy val movieDecoder: Chunk[Byte] => Either[String, Movie] =
+    ProtobufCodec.decode(Schema[Movie])
 
   def spec = suite("SchemaSpec") {
     suite("record capabilities") {

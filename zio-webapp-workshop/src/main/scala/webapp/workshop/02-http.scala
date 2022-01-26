@@ -45,7 +45,7 @@ object HttpSpec extends ZIOSpecDefault {
    * Define an `Http` type that accepts a `String`, cannot fail with any typed
    * error, does not use the environment, and returns an `Int`.
    */
-  type StringToInt = TODO
+  type StringToInt = Http[Any, Nothing, String, Int]
 
   /**
    * EXERCISE
@@ -53,7 +53,7 @@ object HttpSpec extends ZIOSpecDefault {
    * Define an `Http` type that accepts a `Person`, cannot fail with any typed
    * error, does not use the environment, and returns a `String`.
    */
-  type PersonNameExtractor = TODO
+  type PersonNameExtractor = Http[Any, Nothing, Person, String]
 
   /**
    * EXERCISE
@@ -61,7 +61,7 @@ object HttpSpec extends ZIOSpecDefault {
    * Define an `Http` type that accepts an `A`, cannot fail with any typed
    * error, does not use the environment, and returns a `B`.
    */
-  type HttpFunction[-A, +B] = TODO
+  type HttpFunction[-A, +B] = Http[Any, Nothing, A, B]
 
   /**
    * EXERCISE
@@ -69,7 +69,13 @@ object HttpSpec extends ZIOSpecDefault {
    * Define an `Http` type that does not accept anything, can fail with an error
    * of type `E`, uses an environment `R`, and returns an `A`.
    */
-  type HttpZIO[-R, +E, +A] = TODO
+  type HttpZIO[-R, +E, +A] =
+    Http[
+      R,
+      E,
+      Any,
+      A
+    ] // Any to eliminate input (contravariant), Nothing to eliminate output (covariant), Unit to eliminate invariant)
 
   /**
    * EXERCISE
@@ -77,7 +83,8 @@ object HttpSpec extends ZIOSpecDefault {
    * Define an `Http` type that accepts a `Request`, can fail with an error of
    * type `E`, uses an environment `R`, and returns a `Response`.
    */
-  type HttpApp2[-R, +E] = TODO
+  type HttpApp2[-R, +E] = Http[R, E, Request, Response]
+  // type HttpApp[-R, +E] = Http[R, E, Request, Response]
 
   /**
    * EXERCISE
@@ -85,13 +92,13 @@ object HttpSpec extends ZIOSpecDefault {
    * Define a specialization of `HttpApp2` that does not use an environment, and
    * which cannot fail with a typed error.
    */
-  type UHttpApp2 = TODO
+  type UHttpApp2 = HttpApp[Any, Nothing]
 
   /**
    * Define a specialization of `HttpApp2` that uses an environment `R`, and
    * which can fail with an error of type `Throwable`.
    */
-  type RHttpApp2[-R] = TODO
+  type RHttpApp2[-R] = HttpApp[R, Throwable]
 
   //
   // HTTP CONSTRUCTORS
@@ -102,7 +109,7 @@ object HttpSpec extends ZIOSpecDefault {
    *
    * Use `Http.empty` to construct an `Http` that does not handle any inputs.
    */
-  def unhandled: Http[Any, Nothing, Any, Nothing] = TODO
+  def unhandled: Http[Any, Nothing, Any, Nothing] = Http.empty
 
   /**
    * EXERCISE
@@ -110,7 +117,7 @@ object HttpSpec extends ZIOSpecDefault {
    * Use `Http.succeed` to construct an `Http` that succeeds with the constant
    * value `42`.
    */
-  def httpSuccess: Http[Any, Nothing, Any, Int] = TODO
+  def httpSuccess: Http[Any, Nothing, Any, Int] = Http.succeed(42)
 
   /**
    * EXERCISE
@@ -118,7 +125,7 @@ object HttpSpec extends ZIOSpecDefault {
    * Use `Http.fail` to construct an `Http` that fails with the constant value
    * `42`.
    */
-  def httpFailure: Http[Any, Int, Any, Nothing] = TODO
+  def httpFailure: Http[Any, Int, Any, Nothing] = Http.fail(42)
 
   /**
    * EXERCISE
@@ -126,7 +133,7 @@ object HttpSpec extends ZIOSpecDefault {
    * Use `Http.identity` to create an Http whose input is a string, and which
    * succeeds with that same string.
    */
-  def stringIdentity: Http[Any, Nothing, String, String] = TODO
+  def stringIdentity: Http[Any, Nothing, String, String] = Http.identity[String]
 
   /**
    * EXERCISE
@@ -134,7 +141,7 @@ object HttpSpec extends ZIOSpecDefault {
    * Use `Http.fromZIO` to turn `Console.readLine` into an `Http` that succeeds
    * with a line of text from the console.
    */
-  def consoleHttp: Http[Console, IOException, Any, String] = TODO
+  def consoleHttp: Http[Console, IOException, Any, String] = Http.fromZIO(Console.readLine)
 
   //
   // HTTPAPP CONSTRUCTORS
@@ -147,7 +154,13 @@ object HttpSpec extends ZIOSpecDefault {
    * "http://ziowebapp.com/greet", whose headers are empty, and whose data is
    * the plain text string "Hello World!".
    */
-  lazy val exampleRequest1: Request = TODO
+  lazy val exampleRequest1: Request =
+    Request(
+      method = Method.PUT,
+      uri = URL.fromString("http://ziowebapp.com/greet").toOption.get,
+      headers = Headers.empty,
+      data = HttpData.fromString("Hello World")
+    )
 
   /**
    * EXERCISE
@@ -155,35 +168,44 @@ object HttpSpec extends ZIOSpecDefault {
    * Create a `Response` whose status code is `200`, whose headers are empty,
    * and whose body is the plain text string "Hello World!".
    */
-  lazy val exampleResponse1: Response = TODO
+  lazy val exampleResponse1: Response =
+    Response(
+      status = Status.OK,
+      headers = Headers.empty,
+      data = HttpData.fromString("Hello World!")
+    )
 
   /**
    * EXERCISE
    *
    * Create an `HttpApp` that returns an OK status.
    */
-  lazy val httpOk: HttpApp[Any, Nothing] = TODO
+  lazy val httpOk: HttpApp[Any, Nothing] =
+    Http.succeed(Response(status = Status.OK)) // Http.ok
 
   /**
    * EXERCISE
    *
    * Create an `HttpApp` that returns a NOT_FOUND status.
    */
-  lazy val httpNotFound: HttpApp[Any, Nothing] = TODO
+  lazy val httpNotFound: HttpApp[Any, Nothing] =
+    Http.succeed(Response(status = Status.NOT_FOUND)) // Http.notFound
 
   /**
    * EXERCISE
    *
    * Create an `HttpApp` that returns a `Response` with the specified error.
    */
-  def httpError(cause: HttpError): HttpApp[Any, Nothing] = TODO
+  def httpError(cause: HttpError): HttpApp[Any, Nothing] =
+    Http.succeed(Response.fromHttpError(cause))
 
   /**
    * EXERCISE
    *
    * Create a `HttpApp` that returns a BAD_REQUEST status.
    */
-  def httpBadRequest(msg: String): HttpApp[Any, Nothing] = TODO
+  def httpBadRequest(msg: String): HttpApp[Any, Nothing] =
+    Http.succeed(Response(status= Status.NOT_FOUND))
 
   /**
    * EXERCISE
@@ -191,7 +213,7 @@ object HttpSpec extends ZIOSpecDefault {
    * Create a `HttpApp` that successfully returns the specified data. Hint: See
    * the HttpData constructors.
    */
-  def httpFromData(data: HttpData): HttpApp[Any, Nothing] = TODO
+  def httpFromData(data: HttpData): HttpApp[Any, Nothing] = Http.fromFile()
 
   /**
    * EXERCISE

@@ -41,7 +41,13 @@ object JsonSpec extends ZIOSpecDefault {
    * Create a JSON object with fields `name` (set to "Peter") and age (set to
    * 43).
    */
-  lazy val json2: Json = TODO
+  lazy val json2: Json =
+    Json.Obj(
+      Chunk(
+        "name" -> Json.Str("Peter"),
+        "age"  -> Json.Num(43)
+      )
+    )
 
   /**
    * EXERCISE
@@ -49,7 +55,7 @@ object JsonSpec extends ZIOSpecDefault {
    * Use the fromJson[Json] extension method to parse the string into a JSON
    * AST.
    */
-  lazy val json3: Either[String, Json] = """{"name":"John","age":42}""".TODO
+  lazy val json3: Either[String, Json] = """{"name":"John","age":42}""".fromJson[Json]
 
   /**
    * EXERCISE
@@ -63,18 +69,26 @@ object JsonSpec extends ZIOSpecDefault {
    *
    * Use `Json#foldUp` to count the number of Json.Str nodes in the JSON value.
    */
-  lazy val strCount1: Int = json1.TODO
+  lazy val strCount1: Int = json1.foldUp(0) {
+    case (acc, Json.Str(_)) => acc + 1
+    case (acc, _)           => acc
+  }
 
   //
   // JSON CURSORS
   //
+
+  // Special cursors:
+  // - filter by subtype
+  // - point to root
 
   /**
    * EXERCISE
    *
    * Use `JsonCursor.identity` to construct an identity cursor.
    */
-  lazy val identityCursor: JsonCursor[Json, Json] = JsonCursor.TODO
+  lazy val identityCursor: JsonCursor[Json, Json] =
+    JsonCursor.identity
 
   /**
    * EXERCISE
@@ -82,7 +96,8 @@ object JsonSpec extends ZIOSpecDefault {
    * Use `JsonCursor#filterType` to refine `identityCursor` so that it selects
    * only Json.Obj nodes.
    */
-  lazy val objCursor: JsonCursor[Json, Json.Obj] = identityCursor.TODO
+  lazy val objCursor: JsonCursor[Json, Json.Obj] =
+    identityCursor.filterType(JsonType.Obj)
 
   /**
    * EXERCISE
@@ -90,7 +105,8 @@ object JsonSpec extends ZIOSpecDefault {
    * Use `JsonCursor#filterType` to refine `identityCursor` so that it selects
    * only Json.Arr nodes.
    */
-  lazy val arrCursor: JsonCursor[Json, Json.Arr] = identityCursor.TODO
+  lazy val arrCursor: JsonCursor[Json, Json.Arr] =
+    identityCursor.isArray // alternative to line 98
 
   /**
    * EXERCISE
@@ -98,7 +114,8 @@ object JsonSpec extends ZIOSpecDefault {
    * Use `JsonCursor#field` to refine `identityCursor` so that it selects for
    * the field "name" inside a JSON object.
    */
-  lazy val nameFieldCursor: JsonCursor[Json.Obj, Json] = identityCursor.TODO
+  lazy val nameFieldCursor: JsonCursor[Json.Obj, Json] =
+    identityCursor.isObject.field("name")
 
   /**
    * EXERCISE
@@ -106,7 +123,8 @@ object JsonSpec extends ZIOSpecDefault {
    * Use `JsonCursor#element` to refine `identityCursor` so that it selects the
    * first element of a JSON array.
    */
-  lazy val firstElementCursor: JsonCursor[Json.Arr, Json] = identityCursor.TODO
+  lazy val firstElementCursor: JsonCursor[Json.Arr, Json] =
+    identityCursor.isArray.element(0)
 
   /**
    * EXERCISE
@@ -114,7 +132,8 @@ object JsonSpec extends ZIOSpecDefault {
    * Use `Json#get` on a cursor that you create inline to select the "name"
    * field from `json1`.
    */
-  lazy val nameFromJson1: Either[String, Json] = json1.TODO
+  lazy val nameFromJson1: Either[String, Json] =
+    json1.get(nameFieldCursor)
 
   /**
    * EXERCISE
@@ -122,11 +141,18 @@ object JsonSpec extends ZIOSpecDefault {
    * Use `Json#merge` to merge to `json1` with `json4` together.
    */
   lazy val json4: Json   = """{"weight":"70","height":206}""".fromJson[Json].toOption.get
-  lazy val merged1: Json = json1.TODO
+  lazy val merged1: Json = json1.merge(json4)
 
   //
   // ENCODERS
   //
+
+  // JsonEncoder[A] - encodes values of type A into raw JSON
+  // JsonDecoder[A] - decodes values of type A from raw JSON
+  // JsonCodec  [A] - encodes and dexodes values of type A
+
+  val encoder = JsonEncoder[String]
+  encoder.encodeJson("Hello", None)
 
   /**
    * EXERCISE
@@ -139,7 +165,7 @@ object JsonSpec extends ZIOSpecDefault {
     "John"  -> List(1, 2, 3),
     "Peter" -> List(4, 5, 6)
   )
-  lazy val encodedMap1: CharSequence = JsonEncoder.TODO
+  lazy val encodedMap1: CharSequence = JsonEncoder[Map[String, List[Int]]].encodeJson(map1, None)
 
   final case class Email(value: String)
 
@@ -149,7 +175,7 @@ object JsonSpec extends ZIOSpecDefault {
    * Use the `JsonEncoder#contramap` method to contramap a `JsonEncoder[String]`
    * so that it can encode `Email` values.
    */
-  lazy val emailEncoder: JsonEncoder[Email] = JsonEncoder[String].TODO
+  lazy val emailEncoder: JsonEncoder[Email] = JsonEncoder[String].contramap[Email](_.value)
 
   /**
    * EXERCISE
@@ -160,7 +186,7 @@ object JsonSpec extends ZIOSpecDefault {
   val stringEncoder1 = JsonEncoder[String]
   val intEncoder1    = JsonEncoder[Int]
 
-  lazy val tupleEncoder1: JsonEncoder[(String, Int)] = stringEncoder1.TODO
+  lazy val tupleEncoder1: JsonEncoder[(String, Int)] = stringEncoder1.zip(intEncoder1)
 
   /**
    * EXERCISE
@@ -170,7 +196,9 @@ object JsonSpec extends ZIOSpecDefault {
    */
   final case class RestaurantReview(review: String, stars: Int, username: String, restaurantId: Long)
   object RestaurantReview {
-    implicit lazy val encoder: JsonEncoder[RestaurantReview] = DeriveJsonEncoder.TODO
+    import zio.json.jsonDiscriminator._
+
+    implicit lazy val encoder: JsonEncoder[RestaurantReview] = DeriveJsonEncoder.gen[RestaurantReview]
     implicit lazy val decoder: JsonDecoder[RestaurantReview] = restaurantReviewDecoder
   }
 
@@ -188,8 +216,13 @@ object JsonSpec extends ZIOSpecDefault {
     final case class OrderSuccess(orderId: String, time: Long) extends PurchaseEvent
     final case class OrderFailure(orderId: String, time: Long) extends PurchaseEvent
 
-    implicit lazy val encoder: JsonEncoder[PurchaseEvent] = DeriveJsonEncoder.TODO
+    OrderPlaced("order-1", 1555555555)
+    // {"OrderPlaced":{"orderId":"order-1", "time":"1555555555"}} // safer
+    // {"orderId": "order-1", "time": "1555555555", "type": "OrderPlaced"} // developer friendly, but not safe if field "type" is part of the data.
+
+    implicit lazy val encoder: JsonEncoder[PurchaseEvent] = DeriveJsonEncoder.gen[PurchaseEvent]
     implicit lazy val decoder: JsonDecoder[PurchaseEvent] = purchaseEventDecoder
+
   }
 
   //
@@ -204,7 +237,7 @@ object JsonSpec extends ZIOSpecDefault {
    * string `jsonString2` into a map.
    */
   val jsonString2: String                      = """{"John":[1,2,3],"Peter":[4,5,6]}"""
-  lazy val decodedMap1: Map[String, List[Int]] = jsonString2.TODO
+  lazy val decodedMap1: Map[String, List[Int]] = JsonDecoder[Map[String, List[Int]]].decodeJson(jsonString2).toOption
 
   /**
    * EXERCISE
@@ -212,7 +245,7 @@ object JsonSpec extends ZIOSpecDefault {
    * Use `JsonDecoder#map` to map a `JsonDecoder[String]` into a
    * `JsonDecoder[Email]`.
    */
-  lazy val emailDecoder: JsonDecoder[Email] = JsonDecoder[String].TODO
+  lazy val emailDecoder: JsonDecoder[Email] = JsonDecoder[String].map(Email(_))
 
   /**
    * EXERCISE
@@ -223,7 +256,7 @@ object JsonSpec extends ZIOSpecDefault {
   val stringDecoder1 = JsonDecoder[String]
   val intDecoder1    = JsonDecoder[Int]
 
-  lazy val tupleDecoder1: JsonDecoder[(String, Int)] = stringDecoder1.TODO
+  lazy val tupleDecoder1: JsonDecoder[(String, Int)] = stringDecoder1.zip(intDecoder1)
 
   /**
    * EXERCISE
@@ -232,7 +265,7 @@ object JsonSpec extends ZIOSpecDefault {
    * `Boolean`, but if that fails, decode it as an `Int`.
    */
   lazy val boolOrIntDecoder: JsonDecoder[Either[Boolean, Int]] =
-    JsonDecoder[Boolean].TODO
+    JsonDecoder[Boolean].orElseEither(JsonDecoder[Int])
 
   /**
    * EXERCISE
@@ -240,7 +273,8 @@ object JsonSpec extends ZIOSpecDefault {
    * Using `DeriveJsonDecoder.gen`, automatically derive the decoder for the the
    * `RestaurantReview` case class.
    */
-  lazy val restaurantReviewDecoder: JsonDecoder[RestaurantReview] = DeriveJsonDecoder.TODO
+  lazy val restaurantReviewDecoder: JsonDecoder[RestaurantReview] =
+    DeriveJsonDecoder.gen[RestaurantReview]
 
   /**
    * EXERCISE
@@ -248,11 +282,14 @@ object JsonSpec extends ZIOSpecDefault {
    * Using `DeriveJsonDecoder.gen`, automatically derive the decoder for the
    * `PurchaseEvent` sealed trait.
    */
-  lazy val purchaseEventDecoder: JsonDecoder[PurchaseEvent] = DeriveJsonDecoder.TODO
+  lazy val purchaseEventDecoder: JsonDecoder[PurchaseEvent] =
+    DeriveJsonDecoder.gen[PurchaseEvent]
 
   //
   // CODECS
   //
+
+  // JsonCodec[A] - encodes and decodes values of type A
 
   /**
    * EXERCISE
@@ -262,7 +299,7 @@ object JsonSpec extends ZIOSpecDefault {
    */
   final case class Doc(docId: String, content: String, owner: String)
   object Doc {
-    implicit lazy val codec: JsonCodec[Doc] = DeriveJsonCodec.TODO
+    implicit lazy val codec: JsonCodec[Doc] = DeriveJsonCodec.gen[Doc]
   }
 
   //
@@ -282,7 +319,7 @@ object JsonSpec extends ZIOSpecDefault {
    * Convert from a stream of people to a stream of JSON strings.
    */
   def toJsonStream(stream: ZStream[Any, Nothing, Person]): ZStream[Any, Nothing, String] =
-    TODO
+    stream.map(person => JsonEncoder[Person].encodeJson(person, None).toString)
 
   /**
    * EXERCISE
@@ -290,7 +327,7 @@ object JsonSpec extends ZIOSpecDefault {
    * Convert from a stream of JSON strings to a stream of people.
    */
   def toPeopleStream(stream: ZStream[Any, Nothing, String]): ZStream[Any, String, Person] =
-    TODO
+    stream.mapZIO(json => zio.ZIO.fromEither(JsonDecoder[Person].decodeJson(json)))
 
   def spec = suite("JsonSpec") {
     suite("JSON AST") {

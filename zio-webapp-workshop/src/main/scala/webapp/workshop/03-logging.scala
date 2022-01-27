@@ -53,7 +53,7 @@ object LoggingSpec extends ZIOSpecDefault {
         context: Map[FiberRef.Runtime[_], AnyRef],
         spans: List[LogSpan],
         location: ZTraceElement
-      ): String = TODO
+      ): String = s"$logLevel - $message - ${spans.mkString} - $trace"
     }
 
   /**
@@ -63,7 +63,7 @@ object LoggingSpec extends ZIOSpecDefault {
    * message generated, it will append the message to `logOutput` using the
    * function `appendLogMessage`.
    */
-  lazy val testStringLogger: ZLogger[String, Unit]    = testStringLogFormatter.TODO
+  lazy val testStringLogger: ZLogger[String, Unit]    = testStringLogFormatter.map(appendLogMessage(_))
   lazy val testCauseLogger: ZLogger[Cause[Any], Unit] = testStringLogger.contramap[Cause[Any]](_.prettyPrint)
 
   lazy val testLoggerSet: ZLogger.Set[String & Cause[Any], Any] =
@@ -77,7 +77,7 @@ object LoggingSpec extends ZIOSpecDefault {
    */
   lazy val testLoggerAspect: RuntimeConfigAspect =
     RuntimeConfigAspect { config =>
-      config // TODO
+      config.copy(loggers = testLoggerSet)
     }
 
   //
@@ -89,28 +89,32 @@ object LoggingSpec extends ZIOSpecDefault {
    *
    * Using `ZIO.logInfo`, log a message that includes the word `coffee`.
    */
-  lazy val coffeeLogInfo: UIO[Any] = TODO
+  lazy val coffeeLogInfo: UIO[Any] =
+    ZIO.logInfo("coffee")
 
   /**
    * EXERCISE
    *
    * Using `ZIO.logDebug`, log a message that includes the word `tea`.
    */
-  lazy val teaLogDebug: UIO[Any] = TODO
+  lazy val teaLogDebug: UIO[Any] =
+    ZIO.logDebug("tea")
 
   /**
    * EXERCISE
    *
    * Using `ZIO.logError`, log a message that includes the word `milk`.
    */
-  lazy val milkLogError: UIO[Any] = TODO
+  lazy val milkLogError: UIO[Any] =
+    ZIO.logError("milk")
 
   /**
    * EXERCISE
    *
    * Using `ZIO.log`, log a message that includes the word `curry`.
    */
-  lazy val curryLog: UIO[Any] = TODO
+  lazy val curryLog: UIO[Any] =
+    ZIO.log("curry")
 
   /**
    * EXERCISE
@@ -118,7 +122,12 @@ object LoggingSpec extends ZIOSpecDefault {
    * Using `ZIO.logLevel`, set the log level for an inner `ZIO.log` message to
    * `DEBUG`.
    */
-  lazy val logLevelDebug: UIO[Any] = TODO
+  lazy val logLevelDebug: UIO[Any] =
+    ZIO.log("Inside log level debug") @@ LogLevel.Debug
+
+  ZIO.logSpan("database-query") {
+    ZIO.log("Hello")
+  }
 
   /**
    * EXERCISE
@@ -126,7 +135,8 @@ object LoggingSpec extends ZIOSpecDefault {
    * Using `ZIO.logLevel`, set the log level for an inner `ZIO.log` message to
    * `ERROR`.
    */
-  lazy val logLevelError: UIO[Any] = TODO
+  lazy val logLevelError: UIO[Any] =
+    ZIO.log("Inner") @@ LogLevel.Error
 
   //
   // ZIO LOGGING
@@ -140,7 +150,13 @@ object LoggingSpec extends ZIOSpecDefault {
    * major elements of log messages, including time stamp, message, and log
    * level.
    */
-  lazy val myLogFormat: LogFormat = LogFormat.default
+  import LogFormat._
+  lazy val myLogFormat: LogFormat =
+    label("timestamp", timestamp.fixed(32)).color(LogColor.BLUE) |-|
+      label("level", level).highlight |-|
+      label("thread", fiberId).color(LogColor.WHITE) |-|
+      label("message", quoted(line)).highlight |-|
+      label("class", LogFormat.enclosingClass)
 
   /**
    * EXERCISE
@@ -152,8 +168,8 @@ object LoggingSpec extends ZIOSpecDefault {
   lazy val testEffect =
     (for {
       runtimeConfig <- ZIO.runtimeConfig
-      _             <- ZIO.log("Hello World!")
-    } yield ()).TODO
+      _             <- ZIO.log("Hello World!").withRuntimeConfig(zio.logging.console(myLogFormat)(runtimeConfig))
+    } yield ())
 
   def spec = suite("LoggingSpec") {
     def assertLogged(log: UIO[Any])(substrings: String*) =

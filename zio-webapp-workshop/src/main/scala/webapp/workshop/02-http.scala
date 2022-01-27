@@ -207,7 +207,8 @@ object HttpSpec extends ZIOSpecDefault {
    *
    * Create a `HttpApp` that successfully returns the provided response.
    */
-  def httpFromResponse(response: Response): HttpApp[Any, Nothing] = TODO
+  def httpFromResponse(response: Response): HttpApp[Any, Nothing] =
+    Http.response(response)
 
   /**
    * EXERCISE
@@ -228,7 +229,7 @@ object HttpSpec extends ZIOSpecDefault {
    * that returns a string, namely, the string rendering of the integer.
    */
   val intHttp                                          = Http.succeed(42)
-  lazy val stringHttp: Http[Any, Nothing, Any, String] = intHttp.TODO
+  lazy val stringHttp: Http[Any, Nothing, Any, String] = intHttp.map(_.toString())
 
   /**
    * EXERCISE
@@ -237,8 +238,9 @@ object HttpSpec extends ZIOSpecDefault {
    * string), and then use `Console.readLine` to read a line of text from the
    * console.
    */
-  val promptHttp                                                    = Http.succeed("What is your name?")
-  lazy val interactiveHttp: Http[Console, IOException, Any, String] = TODO
+  val promptHttp = Http.succeed("What is your name?")
+  lazy val interactiveHttp: Http[Console, IOException, Any, String] =
+    promptHttp.mapZIO(string => Console.printLine(string) *> Console.readLine)
 
   /**
    * EXERCISE
@@ -246,7 +248,7 @@ object HttpSpec extends ZIOSpecDefault {
    * Using `Http#as`, map the integer return value of `intHttp` into the
    * constant unit value (`()`).
    */
-  lazy val unitHttp: Http[Any, Nothing, Any, Unit] = intHttp.TODO
+  lazy val unitHttp: Http[Any, Nothing, Any, Unit] = intHttp.map(_ => ())
 
   /**
    * EXERCISE
@@ -257,7 +259,7 @@ object HttpSpec extends ZIOSpecDefault {
   val httpDataUsingHttp: Http[Any, Throwable, URL, String] =
     Http.identity[URL].map(_.asString)
   lazy val requestUsingHttp: Http[Any, Throwable, Request, String] =
-    httpDataUsingHttp.TODO
+    httpDataUsingHttp.contramap[Request](_.url)
 
   //
   // COMBINATIONS
@@ -289,7 +291,7 @@ object HttpSpec extends ZIOSpecDefault {
    */
   val usHttp: Http[Any, Nothing, Country, String]          = lift { case Country.US => "I handle the US" }
   val ukHttp: Http[Any, Nothing, Country, String]          = lift { case Country.UK => "I handle the UK" }
-  lazy val usOrUkHttp: Http[Any, Nothing, Country, String] = usHttp.TODO
+  lazy val usOrUkHttp: Http[Any, Nothing, Country, String] = usHttp ++ ukHttp
 
   /**
    * EXERCISE
@@ -306,7 +308,7 @@ object HttpSpec extends ZIOSpecDefault {
   val ukOrFail: Http[Any, String, Country, String] = liftEither {
     case Country.UK => Right("I handle the UK"); case _ => Left("I only handle the UK")
   }
-  lazy val usOrUkOrFail: Http[Any, String, Country, String] = usOrFail.TODO
+  lazy val usOrUkOrFail: Http[Any, String, Country, String] = usOrFail <> ukOrFail
 
   /**
    * EXERCISE
@@ -316,7 +318,7 @@ object HttpSpec extends ZIOSpecDefault {
    */
   val numberToString: Http[Any, Nothing, Int, String]   = Http.fromFunction[Int](_.toString)
   val stringToLength: Http[Any, Nothing, String, Int]   = Http.fromFunction[String](_.length)
-  lazy val digitsInNumber: Http[Any, Nothing, Int, Int] = numberToString.TODO
+  lazy val digitsInNumber: Http[Any, Nothing, Int, Int] = numberToString >>> stringToLength
 
   /**
    * EXERCISE
@@ -326,7 +328,7 @@ object HttpSpec extends ZIOSpecDefault {
    */
   val printPrompt                                                 = Http.fromZIO(Console.printLine("What is your name?"))
   val readAnswer                                                  = Http.fromZIO(Console.readLine)
-  lazy val promptAndRead: Http[Console, IOException, Any, String] = printPrompt.TODO
+  lazy val promptAndRead: Http[Console, IOException, Any, String] = printPrompt *> readAnswer
 
   /**
    * EXERCISE
@@ -336,7 +338,7 @@ object HttpSpec extends ZIOSpecDefault {
    */
   val httpNever                                           = Http.fromZIO(ZIO.never)
   val rightAway                                           = Http.succeed(42)
-  lazy val neverOrRightAway: Http[Any, Nothing, Any, Int] = httpNever.TODO
+  lazy val neverOrRightAway: Http[Any, Nothing, Any, Int] = httpNever.race(rightAway)
 
   /**
    * EXERCISE
@@ -344,8 +346,16 @@ object HttpSpec extends ZIOSpecDefault {
    * Using `flatMap` (directly or with a `for` comprehension), implement the
    * following combinator.
    */
-  def dispatch[R, E, A, B](options: (A, Http[R, E, A, B])*): Http[R, E, A, B] =
-    TODO
+  def dispatch[R, E, A, B](options: (A, Http[R, E, A, B])*): Http[R, E, A, B] = {
+    def lookupMatch(a: A): Option[Http[R, E, A, B]] =
+      options.collectFirst { case (x, h) if x == a => h }
+
+    for {
+      a <- Http.identity[A]
+      b <- lookupMatch(a).getOrElse(Http.empty)
+    } yield b
+  }
+
   lazy val dispatchExample: Http[Any, Nothing, String, String] = dispatch(
     "route1" -> Http.succeed("Handled by route1"),
     "route2" -> Http.succeed("Handled by route2")
@@ -359,7 +369,7 @@ object HttpSpec extends ZIOSpecDefault {
    */
   val httpFailed: Http[Any, String, Any, Nothing]         = Http.fail("I failed")
   val httpSucceeded: Http[Any, Nothing, Any, String]      = Http.succeed("I succeeded")
-  lazy val httpRecovered: Http[Any, Nothing, Any, String] = httpFailed.TODO
+  lazy val httpRecovered: Http[Any, Nothing, Any, String] = httpFailed.catchAll(_ => httpSucceeded)
 
   //
   // ROUTES
@@ -370,14 +380,14 @@ object HttpSpec extends ZIOSpecDefault {
    *
    * Using `!!` (Path.End), construct the root path.
    */
-  lazy val rootPath: Path = TODO
+  lazy val rootPath: Path = !!
 
   /**
    * EXERCISE
    *
    * Using `/`, construct a path `/Baker/221B`.
    */
-  lazy val compositePath: Path = TODO
+  lazy val compositePath: Path = !! / "Baker" / "221B"
 
   /**
    * EXERCISE
@@ -386,7 +396,8 @@ object HttpSpec extends ZIOSpecDefault {
    * tuple.
    */
   lazy val (extractedStreet, extractedNumber) = (compositePath match {
-    case _ => throw new RuntimeException("Unexpected path")
+    case !! / street / number => (street, number)
+    case _                    => throw new RuntimeException("Unexpected path")
   }): (String, String)
 
   /**
@@ -399,8 +410,11 @@ object HttpSpec extends ZIOSpecDefault {
   Request(method = Method.GET, url = URL(!! / "Baker" / "221B")) match {
     case Method.GET -> !! / "Baker" / "221B" => "It matches!"
   }
-  val exampleRequest2                  = Request(method = Method.POST, url = URL(!! / "users" / "sholmes"))
-  lazy val exampleRequestMatch: String = exampleRequest2.TODO
+  val exampleRequest2 = Request(method = Method.POST, url = URL(!! / "users" / "sholmes"))
+  lazy val exampleRequestMatch: String = exampleRequest2 match {
+    case Method.POST -> !! / "users" / "sholmes" => "It matches!"
+    case _                                       => "nope"
+  }
 
   /**
    * EXERCISE
@@ -417,7 +431,10 @@ object HttpSpec extends ZIOSpecDefault {
    * first path), and the farewell "Goodbye!" (for the second path).
    */
   lazy val greetAndFarewell: HttpApp[Any, Nothing] =
-    Http.collect[Request].TODO
+    Http.collect[Request] {
+      case req @ Method.GET -> !! / "greet" => Response.text("Hello there!")
+      case Method.GET -> !! / "farewell"    => Response.text("Goodbye!")
+    }
 
   object UserRepo {
     def lookupUser(id: String): ZIO[Any, Option[Nothing], Person] = ZIO.fromOption(id match {
@@ -435,7 +452,11 @@ object HttpSpec extends ZIOSpecDefault {
    * specified id and return their full name as plain text.
    */
   lazy val lookupUserApp: HttpApp[Any, Option[Nothing]] =
-    Http.collectZIO[Request].TODO
+    Http.collectZIO[Request] { case Method.GET -> !! / "users" / id =>
+      for {
+        person <- UserRepo.lookupUser(id)
+      } yield Response.text(person.name)
+    }
 
   /**
    * EXERCISE
@@ -462,7 +483,7 @@ object HttpSpec extends ZIOSpecDefault {
    */
   import zhttp.service._
   type ServerType = ZIO[Any, Throwable, Nothing]
-  lazy val helloWorldServer: ServerType = helloWorld.TODO
+  lazy val helloWorldServer: ServerType = Server.app(helloWorld).withPort(8080).startDefault
 
   //
   // GRADUATION
@@ -475,7 +496,8 @@ object HttpSpec extends ZIOSpecDefault {
    */
   final case class Todo(id: Long, description: String, created: java.time.Instant, modified: java.time.Instant)
   object Todo {
-    implicit lazy val jsonCodec: JsonCodec[Todo] = TODO
+    implicit lazy val jsonCodec: JsonCodec[Todo] =
+      DeriveJsonCodec.gen[Todo]
   }
 
   /**
@@ -485,7 +507,8 @@ object HttpSpec extends ZIOSpecDefault {
    */
   final case class TodoDescription(description: String)
   object TodoDescription {
-    implicit lazy val jsonCodec: JsonCodec[TodoDescription] = TODO
+    implicit lazy val jsonCodec: JsonCodec[TodoDescription] =
+      DeriveJsonCodec.gen[TodoDescription]
   }
 
   /**
@@ -495,7 +518,8 @@ object HttpSpec extends ZIOSpecDefault {
    */
   final case class TodoCreated(id: Long)
   object TodoCreated {
-    implicit lazy val jsonCodec: JsonCodec[TodoCreated] = TODO
+    implicit lazy val jsonCodec: JsonCodec[TodoCreated] =
+      DeriveJsonCodec.gen[TodoCreated]
   }
 
   final case class TodoRepo(clock: Clock, idGen: Ref[Long], todos: Ref[Map[Long, Todo]]) {
@@ -563,7 +587,8 @@ object HttpSpec extends ZIOSpecDefault {
    * to a `Response`, using the correct `Content-Type` header.
    */
   implicit class AnyExtensions[A](val any: A) extends AnyVal {
-    def toResponse(implicit jsonEncoder: JsonEncoder[A]): Response = TODO
+    def toResponse(implicit jsonEncoder: JsonEncoder[A]): Response =
+      Response.json(any.toJson)
   }
 
   /**
@@ -573,8 +598,16 @@ object HttpSpec extends ZIOSpecDefault {
    * having a `JsonDecoder`.
    */
   implicit class RequestExtensions(val request: Request) extends AnyVal {
-    def as[A: JsonDecoder]: Task[A] = TODO
+    def as[A: JsonDecoder]: Task[A] =
+      for {
+        string <- request.getBodyAsString
+        a      <- ZIO.fromEither(string.fromJson[A]).mapError(stringError => new RuntimeException(stringError))
+      } yield a
+
   }
+
+  def parseInt(string: String): Task[Int] =
+    string.toIntOption.fold[Task[Int]](Task.fail(new IllegalArgumentException("not int")))(Task.succeed(_))
 
   /**
    * EXERCISE
@@ -585,7 +618,32 @@ object HttpSpec extends ZIOSpecDefault {
    * todo with the specified id }}
    */
   lazy val todoApp: HttpApp[TodoRepo, Throwable] =
-    Http.collectZIO[Request].TODO
+    Http.collectZIO[Request] {
+      case request @ Method.GET -> !! / "todos" =>
+        for {
+          todos <- TodoRepo.getAll
+        } yield todos.toResponse
+
+      case request @ Method.GET -> !! / "todos" / id =>
+        val badResponse = Response.fromHttpError(HttpError.BadRequest("todo not found"))
+        for {
+          id   <- parseInt(id)
+          todo <- TodoRepo.getById(id)
+        } yield todo.fold(badResponse)(_.toResponse)
+
+      case request @ Method.POST -> !! / "todos" =>
+        for {
+          desc <- request.as[TodoDescription]
+          todo <- TodoRepo.create(desc.description)
+        } yield todo.toResponse
+
+      case request @ Method.PUT -> !! / "todos" / id =>
+        for {
+          id   <- parseInt(id)
+          desc <- request.as[TodoDescription]
+          todo <- TodoRepo.updateTodo(id, desc.description)
+        } yield todo.toResponse
+    }
 
   implicit class ResponseExtensions(val response: Response) extends AnyVal {
     def as[A: JsonDecoder]: Task[A] =

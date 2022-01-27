@@ -138,6 +138,12 @@ object LoggingSpec extends ZIOSpecDefault {
   lazy val logLevelError: UIO[Any] =
     ZIO.log("Inner") @@ LogLevel.Error
 
+  /**
+    * Using `ZIO.logSpan` with a label of "database-query", log a message
+    * that says "querying database".
+    */
+  lazy val queryingDatabase: UIO[Any] = ZIO.TODO
+
   //
   // ZIO LOGGING
   //
@@ -230,6 +236,9 @@ object LoggingSpec extends ZIOSpecDefault {
           } @@ ignore +
           test("LogLevel.ERROR") {
             assertLogged(logLevelError)("ERROR")
+          } @@ ignore + 
+          test("logSpan") {
+            assertLogged(queryingDatabase)("database-query", "INFO")
           } @@ ignore
       } +
       suite("ZIO Logging") {

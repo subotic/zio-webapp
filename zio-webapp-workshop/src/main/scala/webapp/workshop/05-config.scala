@@ -31,7 +31,8 @@ object ConfigSpec extends ZIOSpecDefault {
    * Using `string`, create a `ConfigDescriptor` that describes a `String` read
    * from a property called "name".
    */
-  lazy val stringName: ConfigDescriptor[String] = TODO
+  lazy val stringName: ConfigDescriptor[String] = ConfigDescriptor.string("name")
+  val altName                                   = nested("name")(ConfigDescriptor.string)
 
   /**
    * EXERCISE
@@ -39,8 +40,8 @@ object ConfigSpec extends ZIOSpecDefault {
    * Using `int`, create a `ConfigDescriptor` that describes an `Int` read from
    * a property called "age".
    */
-  lazy val intAge: ConfigDescriptor[Int] = TODO
-
+  lazy val intAge: ConfigDescriptor[Int]   = ConfigDescriptor.int("age")
+  val intAges: ConfigDescriptor[List[Int]] = list(intAge)
   //
   // OPERATORS
   //
@@ -51,7 +52,11 @@ object ConfigSpec extends ZIOSpecDefault {
    * Using `ConfigDescriptor#optional`, turn the following
    * `ConfigDescriptor[Int]` into `ConfigDescriptor[Option[Int]]`.
    */
-  lazy val optionalInt: ConfigDescriptor[Option[Int]] = int("port").TODO
+  lazy val optionalInt: ConfigDescriptor[Option[Int]] = int("port").optional
+
+  final case class Age(int: Int)
+
+  int("age").transform[Age](Age(_), _.int)
 
   /**
    * EXERCISE
@@ -61,7 +66,7 @@ object ConfigSpec extends ZIOSpecDefault {
    * fails, try the right hand side.
    * @return
    */
-  lazy val passwordOrToken = TODO
+  lazy val passwordOrToken = password <> token
   val password             = string("password")
   val token                = string("token")
 
@@ -72,7 +77,8 @@ object ConfigSpec extends ZIOSpecDefault {
    * descriptors into one, which will produce a tuple of both the name and the
    * age.
    */
-  lazy val nameZipAge: ConfigDescriptor[(String, Int)] = TODO
+  lazy val nameZipAge: ConfigDescriptor[(String, Int)] =
+    stringName zip intAge
 
   /**
    * EXERCISE
@@ -81,7 +87,8 @@ object ConfigSpec extends ZIOSpecDefault {
    * configuration data to be a Map literal (`ConfigSource.fromMap`) with "name"
    * equal to "Sherlock Holmes" and age equal to "42".
    */
-  lazy val personFromMap: ConfigDescriptor[(String, Int)] = TODO
+  lazy val personFromMap: ConfigDescriptor[(String, Int)] =
+    (stringName zip intAge).from(ConfigSource.fromMap(Map("name" -> "Sherlock Holmes", "age" -> "42")))
 
   //
   // ADT CONSTRUCTION
@@ -95,7 +102,8 @@ object ConfigSpec extends ZIOSpecDefault {
    */
   final case class Port(port: Int)
   object Port {
-    implicit lazy val portDescriptor: ConfigDescriptor[Port] = TODO
+    implicit lazy val portDescriptor: ConfigDescriptor[Port] =
+      int("port").to[Port]
   }
 
   /**
@@ -106,7 +114,8 @@ object ConfigSpec extends ZIOSpecDefault {
    */
   final case class Database(url: String, port: Int)
   object Database {
-    implicit lazy val configDescriptor: ConfigDescriptor[Database] = TODO
+    implicit lazy val configDescriptor: ConfigDescriptor[Database] =
+      (string("url") zip int("port")).to[Database]
   }
 
   /**
@@ -117,7 +126,9 @@ object ConfigSpec extends ZIOSpecDefault {
    */
   final case class PersistenceConfig(userDB: Database, adminDB: Database)
   object PersistenceConfig {
-    implicit lazy val configDescriptor: ConfigDescriptor[PersistenceConfig] = TODO
+    implicit lazy val configDescriptor: ConfigDescriptor[PersistenceConfig] =
+      (nested("userDB")(Database.configDescriptor) zip
+        nested("adminDB")(Database.configDescriptor)).to[PersistenceConfig]
   }
 
   /**
@@ -131,8 +142,12 @@ object ConfigSpec extends ZIOSpecDefault {
     final case class URL(value: String)      extends FeedSource
     final case class LocalFile(file: String) extends FeedSource
 
+    val s3: ConfigDescriptor[S3]               = string("bucket").to[S3]
+    val url: ConfigDescriptor[URL]             = string("url").to[URL]
+    val localFile: ConfigDescriptor[LocalFile] = string("file").to[LocalFile]
+
     implicit lazy val configDescriptor: ConfigDescriptor[FeedSource] =
-      enumeration[FeedSource].TODO
+      enumeration[FeedSource](s3, url, localFile)
   }
 
   //

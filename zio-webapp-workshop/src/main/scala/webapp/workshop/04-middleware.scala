@@ -8,6 +8,8 @@ import zio.test._
 import zio.test.TestAspect._
 import zhttp.http._
 import zhttp.http.middleware.HttpMiddleware
+import io.netty.handler.codec.http.cors.CorsConfig
+import zio.logging.LogAnnotation
 
 object MiddlewareSpec extends ZIOSpecDefault {
 
@@ -54,7 +56,10 @@ object MiddlewareSpec extends ZIOSpecDefault {
    * Using `Middleware.cors()`, construct a middleware for Cross-Origin Resource
    * Sharing (CORS).
    */
-  lazy val corsMiddleware: HttpMiddleware[Any, Nothing] = TODO
+  lazy val corsMiddleware: HttpMiddleware[Any, Nothing] = ???
+  // Middleware.cors(Cors.CorsConfig(
+  //   ???
+  // ))
 
   /**
    * EXERCISE
@@ -62,7 +67,8 @@ object MiddlewareSpec extends ZIOSpecDefault {
    * Using `Middleware.debug`, construct a middleware for debugging status,
    * method, URL, and response timing.
    */
-  lazy val debugMiddleware: HttpMiddleware[Console with Clock, IOException] = TODO
+  lazy val debugMiddleware: HttpMiddleware[Console with Clock, IOException] =
+    Middleware.debug
 
   /**
    * EXERCISE
@@ -70,8 +76,9 @@ object MiddlewareSpec extends ZIOSpecDefault {
    * Using `Middleware.addCookie`, construct a middleware that adds the
    * specified cookie to responses.
    */
-  val testCookie                                          = Cookie("sessionId", "12345")
-  lazy val cookieMiddleware: HttpMiddleware[Any, Nothing] = TODO
+  val testCookie = Cookie("sessionId", "12345")
+  lazy val cookieMiddleware: HttpMiddleware[Any, Nothing] =
+    Middleware.addCookie(testCookie)
 
   /**
    * EXERCISE
@@ -79,7 +86,8 @@ object MiddlewareSpec extends ZIOSpecDefault {
    * Using `Middleware.timeout`, construct a middleware that times out requests
    * that take longer than 2 minutes.
    */
-  lazy val timeoutMiddleware: HttpMiddleware[Clock, Nothing] = TODO
+  lazy val timeoutMiddleware: HttpMiddleware[Clock, Nothing] =
+    Middleware.timeout((2.minutes))
 
   /**
    * EXERCISE
@@ -87,7 +95,8 @@ object MiddlewareSpec extends ZIOSpecDefault {
    * Using `Middleware.runBefore`, construct a middleware that prints out
    * "Starting to process request!" before the request is processed.
    */
-  lazy val beforeMiddleware: HttpMiddleware[Console, Nothing] = TODO
+  lazy val beforeMiddleware: HttpMiddleware[Console, Nothing] =
+    Middleware.runBefore(Console.printLine("Starting to process request").ignore)
 
   /**
    * EXERCISE
@@ -95,7 +104,8 @@ object MiddlewareSpec extends ZIOSpecDefault {
    * Using `Middleware.runAfter`, construct a middleware that prints out "Done
    * with request!" after each request.
    */
-  lazy val afterMiddleware: HttpMiddleware[Console, Nothing] = TODO
+  lazy val afterMiddleware: HttpMiddleware[Console, Nothing] =
+    Middleware.runAfter(Console.printLine("Ending process request").ignore)
 
   /**
    * EXERCISE
@@ -103,7 +113,11 @@ object MiddlewareSpec extends ZIOSpecDefault {
    * Using `Middleware.basicAuth`, construct a middleware that performs fake
    * authorization for any user who has password "abc123".
    */
-  lazy val authMiddleware: HttpMiddleware[Any, Nothing] = TODO
+  lazy val authMiddleware: HttpMiddleware[Any, Nothing] =
+    Middleware.basicAuth {
+      case (_, "abc123") => true
+      case _             => false
+    }
 
   /**
    * EXERCISE
@@ -113,11 +127,15 @@ object MiddlewareSpec extends ZIOSpecDefault {
    * definition of Http functions that do not work directly on Request/Response,
    * but rather some user-defined data t ypes.
    */
-  def codecMiddleware[In: JsonDecoder, Out: JsonEncoder]: Middleware[Any, String, In, Out, Request, Response] =
+  def codecMiddleware[In: JsonDecoder, Out: JsonEncoder]: Middleware[Any, Nothing, In, Out, Request, Response] =
     Middleware.codecZIO[Request, Out](
-      request => TODO: ZIO[Any, String, In],
-      response => TODO: ZIO[Any, String, Response]
-    )
+      request =>
+        for {
+          body    <- request.getBodyAsString.orDie
+          decoded <- ZIO.fromEither(implicitly[JsonDecoder[In]].decodeJson(body))
+        } yield decoded,
+      out => ZIO.succeed(Response.json(JsonEncoder[Out].encodeJson(out, None).toString()))
+    ) <> Middleware.succeed(Response.fromHttpError(HttpError.BadRequest("Invalid JSON")))
 
   //
   // OPERATORS
@@ -133,7 +151,8 @@ object MiddlewareSpec extends ZIOSpecDefault {
     case UsersRequest.Create(name, email) => UsersResponse.Created(User(name, email, "abc123"))
     case UsersRequest.Get(id)             => UsersResponse.Got(User(id.toString, "", ""))
   }
-  lazy val usersServiceHttpApp: HttpApp[Any, String] = TODO
+  lazy val usersServiceHttpApp: HttpApp[Any, Nothing] =
+    usersService @@ codecMiddleware[UsersRequest, UsersResponse]
 
   /**
    * EXERCISE
@@ -142,7 +161,8 @@ object MiddlewareSpec extends ZIOSpecDefault {
    * `authMiddleware` to construct a middleware that performs each function in
    * sequence.
    */
-  lazy val beforeAfterAndAuth1: HttpMiddleware[Console, Nothing] = TODO
+  lazy val beforeAfterAndAuth1: HttpMiddleware[Console, Nothing] =
+    beforeMiddleware >>> afterMiddleware >>> authMiddleware
 
   /**
    * EXERCISE
@@ -151,7 +171,8 @@ object MiddlewareSpec extends ZIOSpecDefault {
    * `authMiddleware` to construct a middleware that performs each function in
    * sequence.
    */
-  lazy val beforeAfterAndAuth2: HttpMiddleware[Console, Nothing] = TODO
+  lazy val beforeAfterAndAuth2: HttpMiddleware[Console, Nothing] =
+    beforeMiddleware ++ afterMiddleware ++ authMiddleware
 
   //
   // GRADUATION
@@ -163,7 +184,17 @@ object MiddlewareSpec extends ZIOSpecDefault {
    * Create middleware that logs requests using `ZIO.log*` family of functions.
    * For bonus points, integrate with ZIO Logging's LogFormat.
    */
-  lazy val requestLogger: HttpMiddleware[Any, Nothing] = ???
+  lazy val requestLogger: HttpMiddleware[Any, Nothing] =
+    Middleware.identity.contramapZIO[Request] { request =>
+      val time          = java.lang.System.currentTimeMillis()
+      val path          = request.path
+      val method        = request.method
+      val remote        = request.remoteAddress
+      val userAgent     = request.getUserAgent
+      val contentLength = request.getContentLength
+
+      ZIO.logDebug(s"Request: $time - $path - $method - $remote - $userAgent - $contentLength").as(request)
+    }
 
   /**
    * EXERCISE
@@ -171,7 +202,36 @@ object MiddlewareSpec extends ZIOSpecDefault {
    * Create middleware that logs responses using `ZIO.log*` family of functions.
    * For bonus points, integrate with ZIO Logging's LogFormat.
    */
-  lazy val responseLogger: HttpMiddleware[Any, Nothing] = ???
+  lazy val responseLogger: HttpMiddleware[Any, Nothing] =
+    Middleware.interceptZIO[Request, Response](request => ZIO.succeed(java.lang.System.currentTimeMillis())) {
+      case (response, (request, startTime)) =>
+        ZIO.succeed(response)
+    }
+
+  import zio.logging._
+  def logged[A](
+    logAnn: LogAnnotation[A],
+    proj: Headers => Option[A],
+    unproj: A => Headers
+  ): HttpMiddleware[Any, Nothing] =
+    Middleware.interceptZIO[Request, Response] { request =>
+      proj(request.getHeaders) match {
+        case None => ZIO.succeed(None)
+
+        case some @ Some(a) => logContext.update(_.annotate(logAnn, a)).as(some)
+      }
+    } {
+      case (response, None) => ZIO.succeed(response)
+
+      case (response, Some(a)) => ZIO.succeed(response.addHeaders(unproj(a)))
+    }
+
+  val traceId: HttpMiddleware[Any, Nothing] =
+    logged(
+      LogAnnotation.TraceId,
+      headers => headers.getHeaderValue("X-Trace-Id").map(java.util.UUID.fromString(_)),
+      (uuid: java.util.UUID) => Headers(("X-Trace-Id", uuid.toString))
+    )
 
   def spec = suite("MiddlewareSpec") {
     suite("constructors") {

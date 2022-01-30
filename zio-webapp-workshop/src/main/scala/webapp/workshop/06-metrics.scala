@@ -34,7 +34,11 @@ object MetricsSpec extends ZIOSpecDefault {
    *
    * Using `ZIOMetric.count`, create a counter called `web-requests`.
    */
-  lazy val webRequestsCounter: ZIOMetric.Counter[Any] = TODO
+  lazy val webRequestsCounter: ZIOMetric.Counter[Any] =
+    ZIOMetric.count("web-requests")
+
+  // databaseCall("foo") @@ databaseCounter // ZIOMetric[Any]
+  // databaseCall("foo") <* databaseCounter.increment
 
   /**
    * EXERCISE
@@ -43,7 +47,10 @@ object MetricsSpec extends ZIOSpecDefault {
    * `web-request-durations` that will keep track of the durations of web
    * requests.
    */
-  lazy val requestDurations: ZIOMetric.Histogram[Any] = TODO
+  lazy val requestDurations: ZIOMetric.Histogram[Any] =
+    ZIOMetric.observeDurations("web-request-durations", ZIOMetric.Histogram.Boundaries.linear(0, 100, 100))(
+      _.toMillis.toDouble
+    )
 
   /**
    * EXERCISE
@@ -52,7 +59,8 @@ object MetricsSpec extends ZIOSpecDefault {
    * `database-connections`, which will count database connections on an effect
    * producing an `Int` (which represents the number of active connections).
    */
-  lazy val databaseConnectionGauge: ZIOMetric.Gauge[Int] = TODO
+  lazy val databaseConnectionGauge: ZIOMetric.Gauge[Int] =
+    ZIOMetric.setGaugeWith("database-connections")(_.toInt)
 
   /**
    * EXERCISE
@@ -60,7 +68,8 @@ object MetricsSpec extends ZIOSpecDefault {
    * Using `ZIOMetric.observeSummary`, create a summary metric to be used for
    * tracking request durations on a sliding window of 60 minutes.
    */
-  lazy val requestDurationsSummary: ZIOMetric.Summary[Double] = TODO
+  lazy val requestDurationsSummary: ZIOMetric.Summary[Double] =
+    ZIOMetric.observeSummary("request-duration", 60.minutes, 1000, 0.0, Chunk(0.9, 0.95, 0.99))
 
   /**
    * EXERCISE
@@ -68,7 +77,10 @@ object MetricsSpec extends ZIOSpecDefault {
    * Using `ZIOMetric.occurrencesWith`, create a `SetCount` metric that keeps
    * track of the number of occurrences of each HTTP response status code.
    */
-  lazy val httpResponseStatusCodes: ZIOMetric.SetCount[Int] = TODO
+  lazy val httpResponseStatusCodes: ZIOMetric.SetCount[Int] =
+    ZIOMetric.occurrencesWith("http-response-status-codes", "count")(_.toString)
+
+  httpResponseStatusCodes.observe("200") // add value to histogram
 
   //
   // METRICS USAGE
@@ -80,7 +92,8 @@ object MetricsSpec extends ZIOSpecDefault {
    * Create an `HttpMiddleware` that counts the number of requests, using the
    * `webRequestsCounter` metric.
    */
-  lazy val webRequestsMiddleware: HttpMiddleware[Any, Nothing] = TODO
+  lazy val webRequestsMiddleware: HttpMiddleware[Any, Nothing] =
+    Middleware.runAfter(webRequestsCounter.increment)
 
   /**
    * EXERCISE
@@ -88,7 +101,16 @@ object MetricsSpec extends ZIOSpecDefault {
    * Create an `HttpMiddleware` that observes the durations of requests, using
    * the `requestDurations` metric.
    */
-  lazy val requestsDurationsMiddleware: HttpMiddleware[Any, Nothing] = TODO
+  lazy val requestsDurationsMiddleware: HttpMiddleware[Any, Nothing] =
+    Middleware.interceptZIO[Request, Response](
+      request => ZIO.succeed(java.lang.System.currentTimeMillis()),
+      (request, startTime) => {
+        val endTime = java.lang.System.currentTimeMillis()
+        val delta   = endTime - startTime
+
+        requestDurations.observe(delta.toDouble).as(request)
+      }
+    )
 
   /**
    * EXERCISE
@@ -97,9 +119,9 @@ object MetricsSpec extends ZIOSpecDefault {
    * `databaseConnectionGauge` metric.
    */
   class DatabaseConnectionTracker(ref: Ref[Int]) {
-    def increment: UIO[Int] = ref.updateAndGet(_ + 1)
+    def increment: UIO[Int] = ref.updateAndGet(_ + 1) @@ databaseConnectionGauge
 
-    def decrement: UIO[Int] = ref.updateAndGet(_ - 1)
+    def decrement: UIO[Int] = ref.updateAndGet(_ - 1) @@ databaseConnectionGauge
   }
 
   /**
@@ -108,7 +130,10 @@ object MetricsSpec extends ZIOSpecDefault {
    * Create an `HttpMiddleware` that observes the HTTP response status codes,
    * using the `httpResponseStatusCodes` metric.
    */
-  lazy val httpResponseStatusCodesMiddleware: HttpMiddleware[Any, Nothing] = TODO
+  lazy val httpResponseStatusCodesMiddleware: HttpMiddleware[Any, Nothing] =
+    Middleware.identity.mapZIO[Response] { (response: Response) =>
+      httpResponseStatusCodes.observe(response.status.asJava.code().toString).as(response)
+    }
 
   //
   // GRADUATION
@@ -123,7 +148,15 @@ object MetricsSpec extends ZIOSpecDefault {
    * `HttpMiddleware` that intercepts any request to `/healthcheck`, and which
    * dumps out the metrics as JSON.
    */
-  lazy val metricsMiddleware: HttpMiddleware[Any, Nothing] = TODO
+  lazy val metricsMiddleware: HttpMiddleware[Any, Nothing] =
+    Middleware.interceptZIO[Request, Response] {
+      case Method.GET -> !! / "healthcheck" =>
+        ZIO.succeed(Some(MetricClient.unsafeStates))
+      case request => ZIO.succeed(None)
+    } {
+      case (response, None)  => ZIO.succeed(response)
+      case (_, Some(metric)) => ZIO.succeed(Response.text(metric.toString()))
+    }
 
   def spec = suite("MetricsSpec") {
     suite("metrics construction") {

@@ -132,6 +132,38 @@ object Arch {
    *     functionality exposed by the service truly atomic?
    */
 
+  /*
+
+    Pet, User, Buyer, Seller, Category, Tag, Rating, PetListing
+
+    PetRepo
+      - add a pet to the store
+      - update a pet in the store
+      - delete a pet from the store
+    
+    ListingRepo (will use SearchService)
+      - browse by category
+      - search by tag
+      - search by text
+      - flag listing as inappropriate
+      - rate a listin
+      - buy the pet being listed
+
+    UserRepo
+      - create a user
+      - update a user
+      - delete a user
+
+    SearchService
+      - index content
+      - search index
+
+    PaymentService
+      - charge a credit card
+      - refund a payment
+
+  */
+
   /**
    * EXERCISE
    *

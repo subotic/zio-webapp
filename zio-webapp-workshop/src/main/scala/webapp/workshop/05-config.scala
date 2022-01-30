@@ -231,7 +231,8 @@ object ConfigSpec extends ZIOSpecDefault {
     username: String,
     @name("pwd")
     @names("password", "pwd", "pass")
-    password: String)
+    password: String
+  )
   object Database2 {
     implicit val configDescriptor: ConfigDescriptor[Database2] =
       Descriptor.descriptor[Database2]
@@ -255,7 +256,8 @@ object ConfigSpec extends ZIOSpecDefault {
    * Using `write`, write the value ("John Watson", 46) to a
    * `PropertyTree[String, String]`.
    */
-  lazy val writePerson: Either[String, PropertyTree[String, String]] = TODO
+  lazy val writePerson: Either[String, PropertyTree[String, String]] =
+    write(personFromMap, ("John Watson", 46))
 
   /**
    * EXERCISE
@@ -263,7 +265,8 @@ object ConfigSpec extends ZIOSpecDefault {
    * Using `generateDocs`, generate documentation for the `PersistenceConfig`
    * structure.
    */
-  lazy val docPersistenceConfig: ConfigDocs = generateDocs(PersistenceConfig.configDescriptor)
+  lazy val docPersistenceConfig: ConfigDocs =
+    generateDocs(PersistenceConfig.configDescriptor)
 
   /**
    * EXERCISE
@@ -285,7 +288,23 @@ object ConfigSpec extends ZIOSpecDefault {
    * constructed from `UserDatabaseConfig`.
    */
   object UsersApp extends ZIOAppDefault {
-    def run: ZIO[ZEnv with ZIOAppArgs, Any, Any] = TODO
+    import zhttp.service._
+
+    import UserRepo.{live => userRepo}
+
+    def userDatabaseConfigLayer(args: Chunk[String]): ZLayer[Any, Throwable, UserDatabaseConfig] =
+      read(UserDatabaseConfig.configDescriptor from ConfigSource.fromCommandLineArgs(args.toList)).toLayer
+
+    def run: ZIO[ZEnv with ZIOAppArgs, Any, Any] =
+      for {
+        args <- getArgs
+        _ <- Server
+               .app(usersHttpApp)
+               .withPort(8080)
+               .startDefault[UserRepo]
+               .provide(userRepo, userDatabaseConfigLayer(args))
+      } yield ()
+
   }
 
   final case class UserDatabaseConfig(url: String)

@@ -209,7 +209,13 @@ object ConfigSpec extends ZIOSpecDefault {
    * descriptor for `Database2` can handle a username encoded with the property
    * name "user_name", and a password encoded with the property name "pwd".
    */
-  final case class Database2(username: String, password: String)
+  final case class Database2(
+    @describe("This is the name of the user")
+    @name("user_name")
+    username: String,
+    @name("pwd")
+    @names("password", "pwd", "pass")
+    password: String)
   object Database2 {
     implicit val configDescriptor: ConfigDescriptor[Database2] =
       Descriptor.descriptor[Database2]
@@ -241,7 +247,7 @@ object ConfigSpec extends ZIOSpecDefault {
    * Using `generateDocs`, generate documentation for the `PersistenceConfig`
    * structure.
    */
-  lazy val docPersistenceConfig: ConfigDocs = TODO
+  lazy val docPersistenceConfig: ConfigDocs = generateDocs(PersistenceConfig.configDescriptor)
 
   /**
    * EXERCISE
@@ -249,7 +255,8 @@ object ConfigSpec extends ZIOSpecDefault {
    * Using `generateReport`, generate a report for the `personFromMap`, given
    * the value ("John Watson", 46).
    */
-  lazy val reportOfPersonFromMap: Either[String, ConfigDocs] = TODO
+  lazy val reportOfPersonFromMap: Either[String, ConfigDocs] =
+    generateReport(personFromMap, ("John Watson", 46))
 
   //
   // GRADUATION

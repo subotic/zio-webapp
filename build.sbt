@@ -1,9 +1,9 @@
-val ZioVersion        = "2.0.0-RC1"
-val ZioJsonVersion    = "0.3.0-RC2"
-val ZioHttpVersion    = "2.0.0-RC2"
-val ZioConfigVersion  = "3.0.0-RC1"
+val ZioVersion        = "2.0.0-RC2"
+val ZioJsonVersion    = "0.3.0-RC3"
+val ZioHttpVersion    = "2.0.0-RC3"
+val ZioConfigVersion  = "3.0.0-RC2"
 val ZioSchemaVersion  = "0.2.0-RC1-1"
-val ZioLoggingVersion = "2.0.0-RC4"
+val ZioLoggingVersion = "2.0.0-RC5"
 val ZioZmxVersion     = "2.0.0-M1"
 
 val ScalikeVersion = "4.0.0"
@@ -90,3 +90,67 @@ lazy val docs = project
   )
   .dependsOn(core)
   .enablePlugins(MdocPlugin, DocusaurusPlugin, ScalaUnidocPlugin)
+
+lazy val schemaApi = project
+  .in(file("dsp-schema-api"))
+  .settings(
+    name := "dsp-schema-api",
+    commonDeps,
+    libraryDependencies ++= Seq(
+      "dev.zio" %% "zio-test"     % ZioVersion,
+      "dev.zio" %% "zio-test-sbt" % ZioVersion % Test
+    ),
+    testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework"))
+  )
+  .dependsOn(schemaCore)
+
+lazy val schemaCore = project
+  .in(file("dsp-schema-core"))
+  .settings(
+    name := "dsp-schema-core",
+    commonDeps,
+    libraryDependencies ++= Seq(
+      "dev.zio" %% "zio-test"     % ZioVersion,
+      "dev.zio" %% "zio-test-sbt" % ZioVersion % Test
+    ),
+    testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework"))
+  )
+
+lazy val schemaRepo = project
+  .in(file("dsp-schema-repo"))
+  .settings(
+    name := "dsp-schema-repo",
+    commonDeps,
+    libraryDependencies ++= Seq(
+      "dev.zio" %% "zio-test"     % ZioVersion,
+      "dev.zio" %% "zio-test-sbt" % ZioVersion % Test
+    ),
+    testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework"))
+  )
+  .dependsOn(schemaCore)
+
+lazy val schemaRepoEventStoreService = project
+  .in(file("dsp-schema-repo-eventstore-service"))
+  .settings(
+    name := "dsp-schema-repo-eventstore-service",
+    commonDeps,
+    libraryDependencies ++= Seq(
+      "dev.zio" %% "zio-test"     % ZioVersion,
+      "dev.zio" %% "zio-test-sbt" % ZioVersion % Test
+    ),
+    testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework"))
+  )
+  .dependsOn(schemaRepo)
+
+lazy val schemaRepoSearchService = project
+  .in(file("dsp-schema-repo-search-service"))
+  .settings(
+    name := "dsp-schema-repo-search-service",
+    commonDeps,
+    libraryDependencies ++= Seq(
+      "dev.zio" %% "zio-test"     % ZioVersion,
+      "dev.zio" %% "zio-test-sbt" % ZioVersion % Test
+    ),
+    testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework"))
+  )
+  .dependsOn(schemaRepo)

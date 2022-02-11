@@ -52,8 +52,9 @@ object LoggingSpec extends ZIOSpecDefault {
         message: () => String,
         context: Map[FiberRef.Runtime[_], AnyRef],
         spans: List[LogSpan],
-        location: ZTraceElement
-      ): String = TODO
+        location: ZTraceElement,
+        annotations: Map[String, String]
+      ): String = s"$logLevel - $message - ${spans.mkString} - $trace"
     }
 
   /**

@@ -7,11 +7,16 @@
 package dsp.schema.core.domain
 
 import zio.prelude.Validation
+import dsp.schema.core.services.repo
 
 object SchemaDomain extends App {
   // implicitly["".type =:= "".type]
 
-  type IRI = String
+  type IRI         = String
+  type UserID      = String
+  type UserProfile = String
+  type SchemaID    = String
+  type Schema      = String
 
   final case class OntologyInfo(name: String, projectIri: IRI, label: String, comment: String)
   final case class OntologyClass[A <: Singleton with String](name: A, label: String, comment: String) { self =>
@@ -272,4 +277,17 @@ object SchemaDomain extends App {
 //  // path dependent types
   implicitly[classOne.Tag =:= classOne.Tag]
   // implicitly[classOne.Tag =:= classTwo.Tag]
+}
+
+import zio.RIO
+import dsp.schema.core.domain.SchemaDomain.UserProfile
+import dsp.schema.core.services.SchemaRepo
+
+object TestApp extends App {
+  val lookedupProfile: RIO[SchemaRepo, UserProfile] =
+    for {
+      profile <- repo.lookup("user1")
+    } yield profile
+
+  println(lookedupProfile)
 }

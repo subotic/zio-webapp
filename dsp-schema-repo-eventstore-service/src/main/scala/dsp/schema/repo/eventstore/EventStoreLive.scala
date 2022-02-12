@@ -1,3 +1,3 @@
 package dsp.schema.repo.eventstore
 
-object EventStoreService {}
+trait EventStoreLive {}

@@ -91,6 +91,22 @@ lazy val docs = project
   .dependsOn(core)
   .enablePlugins(MdocPlugin, DocusaurusPlugin, ScalaUnidocPlugin)
 
+
+
+lazy val apiMain = project
+  .in(file("dsp-api-main"))
+  .settings(
+    name := "dsp-api-main",
+    commonDeps,
+    libraryDependencies ++= Seq(
+      "dev.zio" %% "zio-test"     % ZioVersion,
+      "dev.zio" %% "zio-test-sbt" % ZioVersion % Test
+    ),
+    testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework"))
+  )
+  .dependsOn(schemaCore, schemaRepo)
+
+
 lazy val schemaApi = project
   .in(file("dsp-schema-api"))
   .settings(

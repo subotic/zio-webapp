@@ -2,11 +2,11 @@ package dsp.schema.repo
 
 import zio._
 
-import dsp.schema.core.services.SchemaRepo
+import dsp.schema.core.interfaces.SchemaRepo
 
 import dsp.schema.core.domain.SchemaDomain.{UserID, UserProfile}
 
-class TestService extends SchemaRepo.Service {
+case class SchemaRepoTest() extends SchemaRepo {
   private var map: Map[UserID, UserProfile] = Map()
 
   def setTestData(map0: Map[UserID, UserProfile]): Task[Unit] =
@@ -22,8 +22,6 @@ class TestService extends SchemaRepo.Service {
     Task.attempt { map = map + (id -> profile) }
 }
 
-trait SchemaRepoTest extends SchemaRepo {
-  val schemaRepo: TestService = new TestService
+object SchemaRepoTest extends (() => SchemaRepo) {
+  val layer: URLayer[Any, SchemaRepo] = SchemaRepoTest().toLayer
 }
-
-object SchemaRepoTest extends SchemaRepoTest

@@ -255,7 +255,7 @@ object HttpSpec extends ZIOSpecDefault {
    * to `Request` (which contains a `URL` inside of it).
    */
   val httpDataUsingHttp: Http[Any, Throwable, URL, String] =
-    Http.identity[URL].map(_.asString)
+    Http.identity[URL].map(_.toString)
   lazy val requestUsingHttp: Http[Any, Throwable, Request, String] =
     httpDataUsingHttp.TODO
 
@@ -806,7 +806,7 @@ object HttpSpec extends ZIOSpecDefault {
           test("Http#contramap") {
             for {
               result <- requestUsingHttp(exampleRequest1)
-            } yield assertTrue(result != exampleRequest1.url.asString)
+            } yield assertTrue(result != exampleRequest1.url.toString)
           } @@ ignore
       } +
       suite("combinations") {

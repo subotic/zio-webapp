@@ -1,9 +1,6 @@
 package dsp.schema.repo
 
 import zio._
-
-import dsp.schema.repo.SchemaRepo
-
 import dsp.schema.domain.SchemaDomain.{UserID, UserProfile}
 
 case class SchemaRepoTest() extends SchemaRepo {
@@ -23,5 +20,5 @@ case class SchemaRepoTest() extends SchemaRepo {
 }
 
 object SchemaRepoTest extends (() => SchemaRepo) {
-  val layer: URLayer[Any, SchemaRepo] = SchemaRepoTest().toLayer
+  val layer: URLayer[Any, SchemaRepo] = (SchemaRepoTest.apply _).toLayer
 }

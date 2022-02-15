@@ -10,8 +10,8 @@ trait SchemaRepo {
 
 object SchemaRepo {
   def lookup(id: UserID): RIO[SchemaRepo, UserProfile] =
-    ZIO.serviceWithZIO(_.lookup(id))
+    ZIO.serviceWithZIO[SchemaRepo](_.lookup(id))
 
   def update(id: UserID, profile: UserProfile): RIO[SchemaRepo, Unit] =
-    ZIO.serviceWithZIO(_.update(id, profile))
+    ZIO.serviceWithZIO[SchemaRepo](_.update(id, profile))
 }

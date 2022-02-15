@@ -1,6 +1,6 @@
 package dsp.schema.repo
 
-import zio.{Task, UIO, ZIO, URLayer}
+import zio._
 import dsp.schema.domain.SchemaDomain.{UserID, UserProfile}
 
 case class SchemaRepoLive() extends SchemaRepo {
@@ -15,5 +15,5 @@ case class SchemaRepoLive() extends SchemaRepo {
 }
 
 object SchemaRepoLive extends (() => SchemaRepo) {
-  val layer: URLayer[Any, SchemaRepo] = SchemaRepoLive().toLayer
+  val layer: URLayer[Any, SchemaRepo] = (SchemaRepoLive.apply _).toLayer
 }

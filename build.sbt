@@ -36,7 +36,7 @@ lazy val root = project
     publish / skip := true,
     console        := (core / Compile / console).value
   )
-  .aggregate(core, docs, workshop)
+  .aggregate(core, docs, workshop, apiMain)
 
 lazy val commonDeps = libraryDependencies ++= Seq(
   "dev.zio"         %% "zio"                   % ZioVersion,

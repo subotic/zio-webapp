@@ -4,7 +4,7 @@
  *
  */
 
-package dsp.schema.core.domain
+package dsp.schema.domain
 
 import zio.prelude.Validation
 
@@ -279,8 +279,8 @@ object SchemaDomain extends App {
 }
 
 import zio.RIO
-import dsp.schema.core.domain.SchemaDomain.UserProfile
-import dsp.schema.core.interfaces.SchemaRepo
+import dsp.schema.domain.SchemaDomain.UserProfile
+import dsp.schema.repo.SchemaRepo
 
 object TestApp extends App {
   val lookedupProfile: RIO[SchemaRepo, UserProfile] =

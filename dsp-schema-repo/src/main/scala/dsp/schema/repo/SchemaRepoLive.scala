@@ -1,8 +1,7 @@
 package dsp.schema.repo
 
-import dsp.schema.core.interfaces.SchemaRepo
-import dsp.schema.core.domain.SchemaDomain.{UserID, UserProfile}
 import zio.{Task, UIO, ZIO, URLayer}
+import dsp.schema.domain.SchemaDomain.{UserID, UserProfile}
 
 case class SchemaRepoLive() extends SchemaRepo {
 

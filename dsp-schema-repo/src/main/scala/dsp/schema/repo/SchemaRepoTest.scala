@@ -2,9 +2,9 @@ package dsp.schema.repo
 
 import zio._
 
-import dsp.schema.core.interfaces.SchemaRepo
+import dsp.schema.repo.SchemaRepo
 
-import dsp.schema.core.domain.SchemaDomain.{UserID, UserProfile}
+import dsp.schema.domain.SchemaDomain.{UserID, UserProfile}
 
 case class SchemaRepoTest() extends SchemaRepo {
   private var map: Map[UserID, UserProfile] = Map()

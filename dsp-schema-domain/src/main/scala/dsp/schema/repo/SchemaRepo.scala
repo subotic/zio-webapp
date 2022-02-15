@@ -1,6 +1,6 @@
-package dsp.schema.core.interfaces
+package dsp.schema.repo
 
-import dsp.schema.core.domain.SchemaDomain.{UserID, UserProfile}
+import dsp.schema.domain.SchemaDomain.{UserID, UserProfile}
 import zio.{Task, UIO, ZIO, RIO}
 
 trait SchemaRepo {

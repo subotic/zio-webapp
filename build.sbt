@@ -104,7 +104,7 @@ lazy val apiMain = project
     ),
     testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework"))
   )
-  .dependsOn(schemaCore, schemaRepo)
+  .dependsOn(SchemaDomain, schemaRepo, schemaApi)
 
 
 lazy val schemaApi = project
@@ -118,12 +118,12 @@ lazy val schemaApi = project
     ),
     testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework"))
   )
-  .dependsOn(schemaCore)
+  .dependsOn(SchemaDomain)
 
-lazy val schemaCore = project
-  .in(file("dsp-schema-core"))
+lazy val SchemaDomain = project
+  .in(file("dsp-schema-domain"))
   .settings(
-    name := "dsp-schema-core",
+    name := "dsp-schema-domain",
     commonDeps,
     libraryDependencies ++= Seq(
       "dev.zio" %% "zio-test"     % ZioVersion,
@@ -143,7 +143,7 @@ lazy val schemaRepo = project
     ),
     testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework"))
   )
-  .dependsOn(schemaCore)
+  .dependsOn(SchemaDomain)
 
 lazy val schemaRepoEventStoreService = project
   .in(file("dsp-schema-repo-eventstore-service"))
